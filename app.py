@@ -6,7 +6,7 @@ from email.policy import default
 import json
 import dateutil.parser
 import babel
-from flask import Flask, render_template, request, Response, flash, redirect, url_for
+from flask import Flask, jsonify, render_template, request, Response, flash, redirect, url_for
 from flask_moment import Moment
 from flask_sqlalchemy import SQLAlchemy
 import logging
@@ -243,9 +243,21 @@ def create_venue_form():
 def create_venue_submission():
   # TODO: insert form data as a new Venue record in the db, instead
   # TODO: modify data to be the data object returned from db insertion
+  form = VenueForm()
+  
+
+  try:
+      venue = Venue(name=form.name.data, city=form.city.data, state=form.state.data, address=form.address.data, phone=form.phone.data, image_link=form.image_link.data, genres=form.genres.data, facebook_link=form.facebook_link.data, website_link=form.website_link.data,seeking_talent=form.seeking_talent.data, seeking_description=form.seeking_description.data)
+
+      db.session.add(venue)
+      db.session.commit()
+      flash('Venue ' + form.name.data + ' was successfully listed!')
+
+  except:
+      db.session.rollback()
+      flash('An error occurred. Venue ' + form.name.data + ' could not be listed.')
 
   # on successful db insert, flash success
-  flash('Venue ' + request.form['name'] + ' was successfully listed!')
   # TODO: on unsuccessful db insert, flash an error instead.
   # e.g., flash('An error occurred. Venue ' + data.name + ' could not be listed.')
   # see: http://flask.pocoo.org/docs/1.0/patterns/flashing/
@@ -265,7 +277,7 @@ def delete_venue(venue_id):
 @app.route('/artists')
 def artists():
   # TODO: replace with real data returned from querying the database
-  data=[{
+  ''' data=[{
     "id": 4,
     "name": "Guns N Petals",
   }, {
@@ -275,6 +287,11 @@ def artists():
     "id": 6,
     "name": "The Wild Sax Band",
   }]
+ '''
+  result = db.session.query(Artist).with_entities(Artist.id, Artist.name).order_by(Artist.id.asc()).all()
+  print(result)
+  data = jsonify(result)
+
   return render_template('pages/artists.html', artists=data)
 
 @app.route('/artists/search', methods=['POST'])
