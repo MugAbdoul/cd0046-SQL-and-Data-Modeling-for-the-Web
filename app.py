@@ -5,6 +5,7 @@
 from datetime import date, datetime
 from email.policy import default
 import json
+from posixpath import split
 import dateutil.parser
 import babel
 from flask import Flask, jsonify, render_template, request, Response, flash, redirect, url_for
@@ -438,19 +439,23 @@ def show_artist(artist_id):
 @app.route('/artists/<int:artist_id>/edit', methods=['GET'])
 def edit_artist(artist_id):
   form = ArtistForm()
+
+  data = Artist.query.get(artist_id)
+
   artist={
-    "id": 4,
-    "name": "Guns N Petals",
-    "genres": ["Rock n Roll"],
-    "city": "San Francisco",
-    "state": "CA",
-    "phone": "326-123-5000",
-    "website": "https://www.gunsnpetalsband.com",
-    "facebook_link": "https://www.facebook.com/GunsNPetals",
-    "seeking_venue": True,
-    "seeking_description": "Looking for shows to perform at in the San Francisco Bay Area!",
-    "image_link": "https://images.unsplash.com/photo-1549213783-8284d0336c4f?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=300&q=80"
-  }
+    "id": data.id,
+    "name": data.name,
+    "genres": data.genres.replace('{', ' ').replace('}', ' ').split(),
+    "city": data.city,
+    "state": data.state,
+    "phone": data.phone,
+    "website": data.website_link,
+    "facebook_link": data.facebook_link,
+    "seeking_venue": data.seeking_venue,
+    "seeking_description": data.seeking_description,
+    "image_link": data.image_link
+  } 
+
   # TODO: populate form with fields from artist with ID <artist_id>
   return render_template('forms/edit_artist.html', form=form, artist=artist)
 
@@ -458,6 +463,28 @@ def edit_artist(artist_id):
 def edit_artist_submission(artist_id):
   # TODO: take values from the form submitted, and update existing
   # artist record with ID <artist_id> using the new attributes
+
+  data = Artist.query.get(artist_id)
+  form = ArtistForm()
+
+  data.id = artist_id
+  data.name = form.name.data
+  data.genres = form.genres.data
+  data.city = form.city.data
+  data.state = form.state.data
+  data.phone = form.phone.data
+  data.website_link = form.website_link.data
+  data.facebook_link = form.facebook_link.data
+  data.seeking_venue = form.seeking_venue.data
+  data.seeking_description = form.seeking_description.data
+  data.image_link = form.image_link.data
+
+  try:
+    db.session.commit()
+  except:
+    db.session.rollback()
+  finally:
+    db.session.close()
 
   return redirect(url_for('show_artist', artist_id=artist_id))
 
@@ -530,6 +557,7 @@ def shows():
 
     shows = db.session.query(Venue.id.label('venue_id'), Venue.name.label('venue_name'), Artist.id.label('artist_id'), Artist.name.label('artist_name'), Artist.image_link.label('artist_image_link'), Shows.c.start_time.label('start_time')).filter(Shows.c.artist_id == Artist.id).filter(Shows.c.venue_id == Venue.id).all()
     data = []
+
     for show in shows:
         data.append({
           "venue_id": show.venue_id,
