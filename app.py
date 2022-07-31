@@ -2,6 +2,7 @@
 # Imports
 #----------------------------------------------------------------------------#
 
+from datetime import date, datetime
 from email.policy import default
 import json
 import dateutil.parser
@@ -12,9 +13,11 @@ from flask_sqlalchemy import SQLAlchemy
 import logging
 from logging import Formatter, FileHandler
 from flask_wtf import Form
-from sqlalchemy import ForeignKey
+from sqlalchemy import ForeignKey, func
 from forms import *
 from flask_migrate import Migrate
+import collections
+collections.Callable = collections.abc.Callable
 #----------------------------------------------------------------------------#
 # App Config.
 #----------------------------------------------------------------------------#
@@ -37,7 +40,7 @@ Shows = db.Table('shows',
 db.Column('id', db.Integer, primary_key=True),
 db.Column('artist_id',db.Integer, db.ForeignKey('artist.id')),
 db.Column('venue_id',db.Integer, db.ForeignKey('venue.id')),
-db.Column('start_time', db.DateTime, nullable=False)
+db.Column('start_time', db.DateTime, nullable=False, default=func.now())
 )
 
 class Venue(db.Model):
@@ -55,6 +58,11 @@ class Venue(db.Model):
     website_link = db.Column(db.String(120)) 
     seeking_talent = db.Column(db.Boolean, nullable=False, default=False)
     seeking_description = db.Column(db.String(120)) 
+    shows = db.relationship('Artist', secondary=Shows, backref=db.backref('venue', lazy=True))
+    
+
+    def __repr__(self):
+           return '<venue {self.id} {self.name} {self.city} {self.state} {self.address} {self.phone} {self.image_link} {self.genres} {self.facebook_link} {self.website_link} {self.seeking_talent} {self.seeking_description} >'
 
     # TODO: implement any missing fields, as a database migration using Flask-Migrate
 
@@ -72,8 +80,9 @@ class Artist(db.Model):
     website_link = db.Column(db.String(120))
     seeking_venue = db.Column(db.Boolean, nullable=False, default=False)
     seeking_description = db.Column(db.String(120))
-    shows = db.relationship('Venue', secondary=Shows, backref='shows', lazy=True)
 
+    def __repr__(self):
+           return f'<artist {self.id} {self.name} {self.city} {self.state} {self.phone} {self.genres} {self.image_link} {self.facebook_link} {self.website_link} {self.seeking_venue} {self.seeking_description} >'
 
     # TODO: implement any missing fields, as a database migration using Flask-Migrate
 
@@ -99,6 +108,45 @@ app.jinja_env.filters['datetime'] = format_datetime
 
 @app.route('/')
 def index():
+      
+  data3={
+    "id": 6,
+    "name": "The Wild Sax Band",
+    "genres": ["Jazz", "Classical"],
+    "city": "San Francisco",
+    "state": "CA",
+    "phone": "432-325-5432",
+    "seeking_venue": False,
+    "image_link": "https://images.unsplash.com/photo-1558369981-f9ca78462e61?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=794&q=80",
+    "past_shows": [],
+    "upcoming_shows": [{
+      "venue_id": 3,
+      "venue_name": "Park Square Live Music & Coffee",
+      "venue_image_link": "https://images.unsplash.com/photo-1485686531765-ba63b07845a7?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=747&q=80",
+      "start_time": "2035-04-01T20:00:00.000Z"
+    }, {
+      "venue_id": 3,
+      "venue_name": "Park Square Live Music & Coffee",
+      "venue_image_link": "https://images.unsplash.com/photo-1485686531765-ba63b07845a7?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=747&q=80",
+      "start_time": "2035-04-08T20:00:00.000Z"
+    }, {
+      "venue_id": 3,
+      "venue_name": "Park Square Live Music & Coffee",
+      "venue_image_link": "https://images.unsplash.com/photo-1485686531765-ba63b07845a7?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=747&q=80",
+      "start_time": "2035-04-15T20:00:00.000Z"
+    }],
+    "past_shows_count": 0,
+    "upcoming_shows_count": 3,
+  }
+
+  artist = Artist.query.get(1)
+  c_time = datetime.now().strftime('%Y-%m-%d %H:%S:%M')
+  # past_show = Shows.query.options(db.joinedload(Shows.Artist)).filter(Shows.artist_id == 1 ).filter(Shows.start_time < c_time).all()
+
+  ''' for i in artist.shows:
+
+    print(i) '''
+
   return render_template('pages/home.html')
 
 
@@ -248,14 +296,14 @@ def create_venue_submission():
 
   try:
       venue = Venue(name=form.name.data, city=form.city.data, state=form.state.data, address=form.address.data, phone=form.phone.data, image_link=form.image_link.data, genres=form.genres.data, facebook_link=form.facebook_link.data, website_link=form.website_link.data,seeking_talent=form.seeking_talent.data, seeking_description=form.seeking_description.data)
-
       db.session.add(venue)
       db.session.commit()
       flash('Venue ' + form.name.data + ' was successfully listed!')
-
   except:
       db.session.rollback()
       flash('An error occurred. Venue ' + form.name.data + ' could not be listed.')
+  finally:
+    db.session.close()
 
   # on successful db insert, flash success
   # TODO: on unsuccessful db insert, flash an error instead.
@@ -277,20 +325,18 @@ def delete_venue(venue_id):
 @app.route('/artists')
 def artists():
   # TODO: replace with real data returned from querying the database
-  ''' data=[{
-    "id": 4,
-    "name": "Guns N Petals",
-  }, {
-    "id": 5,
-    "name": "Matt Quevedo",
-  }, {
-    "id": 6,
-    "name": "The Wild Sax Band",
-  }]
- '''
-  result = db.session.query(Artist).with_entities(Artist.id, Artist.name).order_by(Artist.id.asc()).all()
-  print(result)
-  data = jsonify(result)
+  # data=[{
+  #   "id": 4,
+  #   "name": "Guns N Petals",
+  # }, {
+  #   "id": 5,
+  #   "name": "Matt Quevedo",
+  # }, {
+  #   "id": 6,
+  #   "name": "The Wild Sax Band",
+  # }]
+
+  data = db.session.query(Artist).with_entities(Artist.id, Artist.name).order_by(Artist.id.asc()).all()
 
   return render_template('pages/artists.html', artists=data)
 
@@ -464,6 +510,8 @@ def create_artist_submission():
   except:
       db.session.rollback()
       flash('An error occurred. Artist ' + form.name.data + ' could not be listed.')
+  finally:
+    db.session.close()
 
 
   # on successful db insert, flash success
@@ -477,45 +525,22 @@ def create_artist_submission():
 
 @app.route('/shows')
 def shows():
-  # displays list of shows at /shows
-  # TODO: replace with real venues data.
-  data=[{
-    "venue_id": 1,
-    "venue_name": "The Musical Hop",
-    "artist_id": 4,
-    "artist_name": "Guns N Petals",
-    "artist_image_link": "https://images.unsplash.com/photo-1549213783-8284d0336c4f?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=300&q=80",
-    "start_time": "2019-05-21T21:30:00.000Z"
-  }, {
-    "venue_id": 3,
-    "venue_name": "Park Square Live Music & Coffee",
-    "artist_id": 5,
-    "artist_name": "Matt Quevedo",
-    "artist_image_link": "https://images.unsplash.com/photo-1495223153807-b916f75de8c5?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=334&q=80",
-    "start_time": "2019-06-15T23:00:00.000Z"
-  }, {
-    "venue_id": 3,
-    "venue_name": "Park Square Live Music & Coffee",
-    "artist_id": 6,
-    "artist_name": "The Wild Sax Band",
-    "artist_image_link": "https://images.unsplash.com/photo-1558369981-f9ca78462e61?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=794&q=80",
-    "start_time": "2035-04-01T20:00:00.000Z"
-  }, {
-    "venue_id": 3,
-    "venue_name": "Park Square Live Music & Coffee",
-    "artist_id": 6,
-    "artist_name": "The Wild Sax Band",
-    "artist_image_link": "https://images.unsplash.com/photo-1558369981-f9ca78462e61?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=794&q=80",
-    "start_time": "2035-04-08T20:00:00.000Z"
-  }, {
-    "venue_id": 3,
-    "venue_name": "Park Square Live Music & Coffee",
-    "artist_id": 6,
-    "artist_name": "The Wild Sax Band",
-    "artist_image_link": "https://images.unsplash.com/photo-1558369981-f9ca78462e61?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=794&q=80",
-    "start_time": "2035-04-15T20:00:00.000Z"
-  }]
-  return render_template('pages/shows.html', shows=data)
+    # displays list of shows at /shows
+    # TODO: replace with real venues data.
+
+    shows = db.session.query(Venue.id.label('venue_id'), Venue.name.label('venue_name'), Artist.id.label('artist_id'), Artist.name.label('artist_name'), Artist.image_link.label('artist_image_link'), Shows.c.start_time.label('start_time')).filter(Shows.c.artist_id == Artist.id).filter(Shows.c.venue_id == Venue.id).all()
+    data = []
+    for show in shows:
+        data.append({
+          "venue_id": show.venue_id,
+          "venue_name": show.venue_name,
+          "artist_id": show.artist_id,
+          "artist_name": show.artist_name,
+          "artist_image_link": show.artist_image_link,
+          "start_time": format_datetime(str(show.start_time))
+        })
+        
+    return render_template('pages/shows.html', shows=data)
 
 @app.route('/shows/create')
 def create_shows():
@@ -527,9 +552,20 @@ def create_shows():
 def create_show_submission():
   # called to create new shows in the db, upon submitting new show listing form
   # TODO: insert form data as a new Show record in the db, instead
+  form = ShowForm()
 
+  try:
+      show = Shows.insert().values(artist_id = form.artist_id.data, venue_id= form.venue_id.data, start_time=format_datetime(str(form.start_time.data)))
+      db.session.execute(show)
+      db.session.commit()
+      flash('Show was successfully listed!')
+  except:
+      db.session.rollback()
+      flash('An error occurred. Show could not be listed.')
+  finally:
+    db.session.close()
+  
   # on successful db insert, flash success
-  flash('Show was successfully listed!')
   # TODO: on unsuccessful db insert, flash an error instead.
   # e.g., flash('An error occurred. Show could not be listed.')
   # see: http://flask.pocoo.org/docs/1.0/patterns/flashing/
