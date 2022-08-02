@@ -59,7 +59,7 @@ class Venue(db.Model):
     website_link = db.Column(db.String(120)) 
     seeking_talent = db.Column(db.Boolean, nullable=False, default=False)
     seeking_description = db.Column(db.String(120)) 
-    shows = db.relationship('Artist', secondary=Shows, backref=db.backref('venue', lazy=True))
+    shows = db.relationship('Artist', secondary=Shows, backref=db.backref('venue', lazy=True), cascade="save-update, merge, delete")
     
 
     def __repr__(self):
@@ -158,27 +158,32 @@ def index():
 def venues():
   # TODO: replace with real venues data.
   #       num_upcoming_shows should be aggregated based on number of upcoming shows per venue.
-  data=[{
-    "city": "San Francisco",
-    "state": "CA",
-    "venues": [{
-      "id": 1,
-      "name": "The Musical Hop",
-      "num_upcoming_shows": 0,
-    }, {
-      "id": 3,
-      "name": "Park Square Live Music & Coffee",
-      "num_upcoming_shows": 1,
-    }]
-  }, {
-    "city": "New York",
-    "state": "NY",
-    "venues": [{
-      "id": 2,
-      "name": "The Dueling Pianos Bar",
-      "num_upcoming_shows": 0,
-    }]
-  }]
+  
+  data=[]
+
+  city_states = db.session.query(Venue.city, Venue.state).group_by(Venue.city,  Venue.state).all()
+
+  for city_state in city_states:
+        
+        res = {
+          "city": city_state.city,
+          "state": city_state.state,
+          "venues": []
+        }
+
+        venues = db.session.query(Venue.id, Venue.name).filter(Venue.city == city_state.city, Venue.state == city_state.state).all()
+
+        for venue in venues:
+            
+            shows = db.session.query(Shows.c.start_time).filter(Shows.c.venue_id == venue.id).all()
+            res["venues"].append({
+              "id": venue.id,
+              "name":  venue.name,
+              "num_upcoming_shows": len(list(filter(lambda show: show.start_time > datetime.now(), shows)))
+            })
+        
+        data.append(res)
+
   return render_template('pages/venues.html', areas=data);
 
 @app.route('/venues/search', methods=['POST'])
@@ -270,7 +275,6 @@ def create_venue_submission():
   # TODO: insert form data as a new Venue record in the db, instead
   # TODO: modify data to be the data object returned from db insertion
   form = VenueForm()
-  
 
   try:
       venue = Venue(name=form.name.data, city=form.city.data, state=form.state.data, address=form.address.data, phone=form.phone.data, image_link=form.image_link.data, genres=form.genres.data, facebook_link=form.facebook_link.data, website_link=form.website_link.data,seeking_talent=form.seeking_talent.data, seeking_description=form.seeking_description.data)
@@ -293,18 +297,21 @@ def create_venue_submission():
 def delete_venue(venue_id):
   # TODO: Complete this endpoint for taking a venue_id, and using
   # SQLAlchemy ORM to delete a record. Handle cases where the session commit could fail.
-  venue = Venue.query.get(venue_id)
-  db.session.delete(venue)
-  db.session.commit()
-  ''' try:
+  
+  try:
+    venue = Venue.query.get(venue_id)
+    db.session.delete(venue)
+    db.session.commit()
+    flash("Venue " + venue.name + " was deleted successfully!")
   except:
       db.session.rollback()
+      flash("Something went wrong!")
   finally:
-      db.session.close() '''
+      db.session.close()
 
   # BONUS CHALLENGE: Implement a button to delete a Venue on a Venue Page, have it so that
   # clicking that button delete it from the db then redirect the user to the homepage
-  return redirect(url_for('index'))
+  return redirect(url_for("index"))
 
 #  Artists
 #  ----------------------------------------------------------------

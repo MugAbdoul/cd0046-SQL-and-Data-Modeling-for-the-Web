@@ -8,5 +8,5 @@ const delBtn = document.querySelector("#delbtn");
 const deleteVenue = async () => {
     fetch("http://127.0.0.1:5000/venues/" + delBtn.dataset.id, {
         method: "DELETE",
-    }).then((res) => console.log(res.ok));
+    }).then((res) => (window.location.href = "/"));
 };
