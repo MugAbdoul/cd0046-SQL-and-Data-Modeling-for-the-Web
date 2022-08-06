@@ -139,6 +139,8 @@ def show_venue(venue_id):
   # TODO: replace with real venue data from the venues table, using venue_id
 
   venue = Venue.query.get(venue_id)
+  shows_query = db.session.query(Show).join(Artist).filter(Show.venue_id==venue_id).all()
+
 
   data = {
     "id": venue.id,
@@ -158,7 +160,7 @@ def show_venue(venue_id):
   }
 
 
-  for show in venue.shows:
+  for show in shows_query:
     if show.start_time > datetime.now():
           data["upcoming_shows"].append({
             "artist_id": show.artist_id,
@@ -192,16 +194,19 @@ def create_venue_submission():
   # TODO: modify data to be the data object returned from db insertion
   form = VenueForm(request.form)
 
-  try:
-      venue = Venue(name=form.name.data, city=form.city.data, state=form.state.data, address=form.address.data, phone=form.phone.data, image_link=form.image_link.data, genres=form.genres.data, facebook_link=form.facebook_link.data, website_link=form.website_link.data,seeking_talent=form.seeking_talent.data, seeking_description=form.seeking_description.data)
-      db.session.add(venue)
-      db.session.commit()
-      flash('Venue ' + form.name.data + ' was successfully listed!')
-  except:
-      db.session.rollback()
-      flash('An error occurred. Venue ' + form.name.data + ' could not be listed.')
-  finally:
-    db.session.close()
+  if form.validate_inputs():
+    try:
+        venue = Venue(name=form.name.data, city=form.city.data, state=form.state.data, address=form.address.data, phone=form.phone.data, image_link=form.image_link.data, genres=form.genres.data, facebook_link=form.facebook_link.data, website_link=form.website_link.data,seeking_talent=form.seeking_talent.data, seeking_description=form.seeking_description.data)
+        db.session.add(venue)
+        db.session.commit()
+        flash('Venue ' + form.name.data + ' was successfully listed!')
+    except:
+        db.session.rollback()
+        flash('An error occurred. Venue ' + form.name.data + ' could not be listed.')
+    finally:
+      db.session.close()
+  else:
+      flash('An error occurred. Please enter valid inputs')
 
   # on successful db insert, flash success
   # TODO: on unsuccessful db insert, flash an error instead.
@@ -273,6 +278,7 @@ def show_artist(artist_id):
   # TODO: replace with real artist data from the artist table, using artist_id
 
   artist = Artist.query.get(artist_id)
+  shows_query = db.session.query(Show).join(Venue).filter(Show.artist_id==artist_id).all() 
 
   data = {
     "id": artist.id,
@@ -291,7 +297,7 @@ def show_artist(artist_id):
   }
 
 
-  for show in artist.shows:
+  for show in shows_query:
     if show.start_time > datetime.now():
           data["upcoming_shows"].append({
             "venue_id": show.venue_id,
@@ -442,16 +448,19 @@ def create_artist_submission():
 
   # TODO: modify data to be the data object returned from db insertion
   form = ArtistForm(request.form)
-  artist = Artist(name=form.name.data,city=form.city.data,state=form.state.data,phone=form.phone.data,image_link=form.image_link.data,genres=form.genres.data,facebook_link=form.facebook_link.data,website_link=form.website_link.data,seeking_venue=form.seeking_venue.data,seeking_description=form.seeking_description.data)
-  db.session.add(artist)
-  db.session.commit()
-  try:
-    flash('Artist ' + form.name.data + ' was successfully listed!')
-  except:
-      db.session.rollback()
-      flash('An error occurred. Artist ' + form.name.data + ' could not be listed.')
-  finally:
-    db.session.close()
+  if form.validate_inputs():
+    try:
+      artist = Artist(name=form.name.data,city=form.city.data,state=form.state.data,phone=form.phone.data,image_link=form.image_link.data,genres=form.genres.data,facebook_link=form.facebook_link.data,website_link=form.website_link.data,seeking_venue=form.seeking_venue.data,seeking_description=form.seeking_description.data)
+      db.session.add(artist)
+      db.session.commit()
+      flash('Artist ' + form.name.data + ' was successfully listed!')
+    except:
+        db.session.rollback()
+        flash('An error occurred. Artist ' + form.name.data + ' could not be listed.')
+    finally:
+      db.session.close()
+  else:
+      flash('An error occurred. Please enter valid inputs')
 
 
   # on successful db insert, flash success
